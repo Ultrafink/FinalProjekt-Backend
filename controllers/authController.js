@@ -60,20 +60,29 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Находим пользователя по email
-    const user = await User.findOne({ email });
+    if (!email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
 
-    if (!user) return res.status(400).json({ message: "Invalid email" });
-
-    // Проверяем пароль
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(400).json({ message: "Incorrect password" });
-
-    // Создаём JWT токен
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
+    // 🔥 Ищем по email ИЛИ username
+    const user = await User.findOne({
+      $or: [{ email }, { username: email }],
     });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
     res.json({
       token,
@@ -82,13 +91,15 @@ export const login = async (req, res) => {
         email: user.email,
         username: user.username,
         fullName: user.fullName,
-        avatar: user.avatar,
+        avatar: user.avatar || "",
       },
     });
   } catch (error) {
+    console.log("Login error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 export const getMe = async (req, res) => {
   try {
