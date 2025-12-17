@@ -8,6 +8,8 @@ import { fileURLToPath } from "url";
 import authRoutes from "./routes/authRoutes.js";
 import postRoutes from "./routes/postRoutes.js";
 
+import userRoutes from "./routes/userRoutes.js";
+
 dotenv.config();
 
 const app = express();
@@ -29,6 +31,9 @@ app.use("/auth", authRoutes);
 
 // Посты (создание, получение)
 app.use("/posts", postRoutes);
+
+// Юзеры
+app.use("/users", userRoutes);
 
 // Тестовый корневой маршрут
 app.get("/", (req, res) => {

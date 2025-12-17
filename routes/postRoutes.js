@@ -1,11 +1,15 @@
 import express from "express";
 import multer from "multer";
-import { createPost, getFeed } from "../controllers/postController.js";
+import {
+  createPost,
+  getFeed,
+  getMyPosts,
+} from "../controllers/postController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Настройка Multer
+// --- Multer ---
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) =>
@@ -14,10 +18,13 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Создать пост
-router.post("/", authMiddleware, upload.single("image"), createPost);
+// 🔹 МОИ ПОСТЫ (HOME)
+router.get("/me", authMiddleware, getMyPosts);
 
-// Получить все посты
+// 🔹 ВСЯ ЛЕНТА (EXPLORE)
 router.get("/", authMiddleware, getFeed);
+
+// 🔹 СОЗДАНИЕ ПОСТА
+router.post("/", authMiddleware, upload.single("image"), createPost);
 
 export default router;
