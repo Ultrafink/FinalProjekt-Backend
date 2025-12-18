@@ -113,3 +113,16 @@ export const createPost = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+export const getExplore = async (req, res) => {
+  try {
+    const posts = await Post.find()
+      .populate("author", "username avatar")
+      .sort({ createdAt: -1 });
+
+    res.json(posts);
+  } catch (err) {
+    console.log("Get explore error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

@@ -8,6 +8,9 @@ import {
   getPostById,
   createPost,
 } from "../controllers/postController.js";
+import { getExplore } from "../controllers/postController.js";
+
+router.get("/explore", authMiddleware, getExplore);
 
 const router = express.Router();
 
