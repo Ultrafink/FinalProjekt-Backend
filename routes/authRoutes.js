@@ -1,4 +1,4 @@
-import express from "express";
+import { Router } from "express";
 import {
   register,
   login,
@@ -8,14 +8,16 @@ import {
 } from "../controllers/authController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
-const router = express.Router();
+const router = Router();
 
 router.post("/register", register);
 router.post("/login", login);
+
+// Защищённый маршрут (нужен Authorization: Bearer <token>)
 router.get("/me", authMiddleware, getMe);
 
 // Восстановление пароля
-router.post("/request-password-reset", requestPasswordReset);
-router.post("/reset-password", resetPassword);
+router.post("/password-reset/request", requestPasswordReset);
+router.post("/password-reset/confirm", resetPassword);
 
 export default router;
