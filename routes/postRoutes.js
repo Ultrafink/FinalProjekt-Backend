@@ -7,10 +7,8 @@ import {
   getUserPosts,
   getPostById,
   createPost,
+  getExplore,
 } from "../controllers/postController.js";
-import { getExplore } from "../controllers/postController.js";
-
-router.get("/explore", authMiddleware, getExplore);
 
 const router = express.Router();
 
@@ -29,10 +27,13 @@ const upload = multer({ storage });
    🔹 Роуты
 =========================== */
 
-// мой feed (Home)
+// Explore (все посты) — важно: выше "/:id"
+router.get("/explore", authMiddleware, getExplore);
+
+// мой feed (у тебя это "мои посты")
 router.get("/me", authMiddleware, getMyPosts);
 
-// лента подписок (на будущее)
+// лента подписок (Home)
 router.get("/feed", authMiddleware, getFeed);
 
 // посты пользователя
