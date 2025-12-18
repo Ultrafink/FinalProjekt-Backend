@@ -46,6 +46,32 @@ export const updateMe = async (req, res) => {
 };
 
 /* ===========================
+   🔹 ОБНОВЛЕНИЕ АВАТАРА (multipart/form-data)
+   PATCH /users/me/avatar
+=========================== */
+export const updateMyAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Avatar file is required" });
+    }
+
+    // server.js раздаёт папку uploads по /uploads, поэтому сохраняем так
+    const avatar = `/uploads/${req.file.filename}`;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { avatar },
+      { new: true }
+    ).select("-password");
+
+    return res.json(updatedUser);
+  } catch (err) {
+    console.log("Update avatar error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ===========================
    🔹 ПУБЛИЧНЫЙ ПРОФИЛЬ ПО USERNAME
    (возвращает { user, stats } под твой ProfilePage)
 =========================== */
