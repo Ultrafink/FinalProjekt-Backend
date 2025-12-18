@@ -2,54 +2,48 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+// Делает абсолютный URL для /uploads/...
+// (с защитой, если файл вдруг окажется в браузерной сборке и process будет undefined)
+const toPublicUrl = (req, value) => {
+  if (!value) return "";
+  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+
+  const envBase =
+    (typeof process !== "undefined" && process?.env?.BASE_URL)
+      ? process.env.BASE_URL
+      : "";
+
+  const base = envBase || `${req.protocol}://${req.get("host")}`;
+
+  return `${base}${value.startsWith("/") ? "" : "/"}${value}`;
+};
+
 export const register = async (req, res) => {
   try {
     const { email, username, fullName, password } = req.body;
 
-    // Проверка пустых полей
-    if (!email)
-      return res.status(400).json({ message: "Email is required" });
+    if (!email) return res.status(400).json({ message: "Email is required" });
+    if (!username) return res.status(400).json({ message: "Username is required" });
+    if (!fullName) return res.status(400).json({ message: "Full name is required" });
+    if (!password) return res.status(400).json({ message: "Password is required" });
 
-    if (!username)
-      return res.status(400).json({ message: "Username is required" });
-
-    if (!fullName)
-      return res.status(400).json({ message: "Full name is required" });
-
-    if (!password)
-      return res.status(400).json({ message: "Password is required" });
-
-    // Проверка правильности email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email))
+    if (!emailRegex.test(email)) {
       return res.status(400).json({ message: "Invalid email format" });
+    }
 
-    // Проверяем, есть ли такой email уже
     const exists = await User.findOne({ email });
-    if (exists) {
-      return res.status(400).json({ message: "Email already exists" });
-    }
+    if (exists) return res.status(400).json({ message: "Email already exists" });
 
-    // Проверяем username
     const existsUser = await User.findOne({ username });
-    if (existsUser) {
-      return res.status(400).json({ message: "Username already exists" });
-    }
+    if (existsUser) return res.status(400).json({ message: "Username already exists" });
 
-    // Хешируем пароль
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = new User({
-      email,
-      username,
-      fullName,
-      password: hashedPassword,
-    });
-
+    const user = new User({ email, username, fullName, password: hashedPassword });
     await user.save();
 
     return res.json({ message: "User registered successfully" });
-
   } catch (error) {
     console.log("Register error:", error);
     return res.status(500).json({ message: "Server error" });
@@ -64,19 +58,15 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // 🔥 Ищем по email ИЛИ username
+    // Ищем по email ИЛИ username (username приходит в поле email)
     const user = await User.findOne({
       $or: [{ email }, { username: email }],
     });
 
-    if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
+    if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
+    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
     const token = jwt.sign(
       { id: user._id },
@@ -91,7 +81,7 @@ export const login = async (req, res) => {
         email: user.email,
         username: user.username,
         fullName: user.fullName,
-        avatar: user.avatar || "",
+        avatar: toPublicUrl(req, user.avatar),
       },
     });
   } catch (error) {
@@ -100,18 +90,31 @@ export const login = async (req, res) => {
   }
 };
 
-
 export const getMe = async (req, res) => {
   try {
-    res.json(req.user); // user уже получен в middleware
+    // Берём актуального юзера из БД без пароля
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json({
+      id: user._id,
+      email: user.email,
+      username: user.username,
+      fullName: user.fullName,
+      avatar: toPublicUrl(req, user.avatar),
+      website: user.website || "",
+      about: user.about || "",
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    });
   } catch (error) {
+    console.log("Get me error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
 // --- Восстановление пароля ---
 
-// Отправка запроса на восстановление пароля
 export const requestPasswordReset = async (req, res) => {
   try {
     const { email } = req.body;
@@ -120,13 +123,11 @@ export const requestPasswordReset = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Генерируем JWT-токен с коротким сроком действия (например 15 минут)
     const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "15m",
     });
 
-    // В реальном приложении: отправка email с этим токеном
-    // Для учебного проекта просто возвращаем токен
+    // В учебном проекте возвращаем токен прямо в ответе
     res.json({ message: "Reset token generated", resetToken });
   } catch (err) {
     console.log("Request password reset error:", err);
@@ -134,14 +135,15 @@ export const requestPasswordReset = async (req, res) => {
   }
 };
 
-// Сброс пароля по токену
 export const resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
-    if (!token || !newPassword)
+    if (!token || !newPassword) {
       return res.status(400).json({ message: "Token and new password are required" });
+    }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
     const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
