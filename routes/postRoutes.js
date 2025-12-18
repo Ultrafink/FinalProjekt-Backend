@@ -8,6 +8,9 @@ import {
   getPostById,
   createPost,
   getExplore,
+  toggleLike,
+  addComment,
+  deletePost,
 } from "../controllers/postController.js";
 
 const router = express.Router();
@@ -17,10 +20,8 @@ const router = express.Router();
 =========================== */
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + "-" + file.originalname),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
 });
-
 const upload = multer({ storage });
 
 /* ===========================
@@ -38,6 +39,11 @@ router.get("/feed", authMiddleware, getFeed);
 
 // посты пользователя
 router.get("/user/:username", authMiddleware, getUserPosts);
+
+// лайки и комменты (должны быть выше "/:id")
+router.post("/:id/like", authMiddleware, toggleLike);
+router.post("/:id/comments", authMiddleware, addComment);
+router.delete("/:id", authMiddleware, deletePost);
 
 // один пост
 router.get("/:id", authMiddleware, getPostById);

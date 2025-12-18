@@ -11,6 +11,7 @@ import {
   updateMe,
   getUserProfile,
   updateMyAvatar,
+  toggleFollow,
 } from "../controllers/userController.js";
 
 const router = express.Router();
@@ -21,10 +22,8 @@ const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Абсолютный путь к backend/uploads
 const uploadDir = path.join(__dirname, "..", "uploads");
 
-// ✅ ВАЖНО: гарантируем, что папка существует (иначе на Render будет ENOENT)
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -41,13 +40,15 @@ const upload = multer({ storage });
 =========================== */
 router.get("/me", authMiddleware, getMe);
 router.patch("/me", authMiddleware, updateMe);
-
-// ✅ Аватар
 router.patch("/me/avatar", authMiddleware, upload.single("avatar"), updateMyAvatar);
 
 /* ===========================
-   🔹 ПУБЛИЧНЫЙ ПРОФИЛЬ
-   (публичный, но если токен есть — добавит isMe)
+   🔹 FOLLOW/UNFOLLOW (toggle)
+=========================== */
+router.post("/u/:id/follow", authMiddleware, toggleFollow);
+
+/* ===========================
+   🔹 ПУБЛИЧНЫЙ ПРОФИЛЬ ПО USERNAME
 =========================== */
 router.get("/:username", optionalAuthMiddleware, getUserProfile);
 

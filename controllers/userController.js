@@ -46,8 +46,7 @@ export const updateMe = async (req, res) => {
 };
 
 /* ===========================
-   🔹 ОБНОВЛЕНИЕ АВАТАРА (multipart/form-data)
-   PATCH /users/me/avatar
+   🔹 ОБНОВЛЕНИЕ АВАТАРА
 =========================== */
 export const updateMyAvatar = async (req, res) => {
   try {
@@ -55,7 +54,6 @@ export const updateMyAvatar = async (req, res) => {
       return res.status(400).json({ message: "Avatar file is required" });
     }
 
-    // server.js раздаёт папку uploads по /uploads, поэтому сохраняем так
     const avatar = `/uploads/${req.file.filename}`;
 
     const updatedUser = await User.findByIdAndUpdate(
@@ -73,20 +71,16 @@ export const updateMyAvatar = async (req, res) => {
 
 /* ===========================
    🔹 ПУБЛИЧНЫЙ ПРОФИЛЬ ПО USERNAME
-   (возвращает { user, stats } под твой ProfilePage)
 =========================== */
 export const getUserProfile = async (req, res) => {
   try {
     const { username } = req.params;
 
     const userDoc = await User.findOne({ username }).select("-password");
-    if (!userDoc) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (!userDoc) return res.status(404).json({ message: "User not found" });
 
     const postsCount = await Post.countDocuments({ author: userDoc._id });
 
-    // req.user будет только если ты повесил optionalAuthMiddleware на роут /users/:username
     const isMe = req.user && userDoc._id.toString() === req.user.id;
 
     const user = {
@@ -107,6 +101,50 @@ export const getUserProfile = async (req, res) => {
     return res.json({ user, stats });
   } catch (err) {
     console.log("Get user profile error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ===========================
+   🔹 FOLLOW / UNFOLLOW (TOGGLE)
+   POST /users/u/:id/follow
+=========================== */
+export const toggleFollow = async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const meId = req.user.id;
+
+    if (String(targetId) === String(meId)) {
+      return res.status(400).json({ message: "You can't follow yourself" });
+    }
+
+    const [me, target] = await Promise.all([
+      User.findById(meId),
+      User.findById(targetId),
+    ]);
+
+    if (!me || !target) return res.status(404).json({ message: "User not found" });
+
+    const isFollowing = (me.following || []).some(
+      (id) => String(id) === String(targetId)
+    );
+
+    if (isFollowing) {
+      await Promise.all([
+        User.findByIdAndUpdate(meId, { $pull: { following: targetId } }),
+        User.findByIdAndUpdate(targetId, { $pull: { followers: meId } }),
+      ]);
+    } else {
+      await Promise.all([
+        User.findByIdAndUpdate(meId, { $addToSet: { following: targetId } }),
+        User.findByIdAndUpdate(targetId, { $addToSet: { followers: meId } }),
+      ]);
+    }
+
+    const updatedMe = await User.findById(meId).select("-password");
+    return res.json(updatedMe);
+  } catch (err) {
+    console.log("Toggle follow error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };
