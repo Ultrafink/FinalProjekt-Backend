@@ -10,7 +10,7 @@ import postRoutes from "./routes/postRoutes.js";
 
 import userRoutes from "./routes/userRoutes.js";
 
-
+app.set("trust proxy", 1);
 
 dotenv.config();
 
