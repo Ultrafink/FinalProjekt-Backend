@@ -7,14 +7,18 @@ import { fileURLToPath } from "url";
 
 import authRoutes from "./routes/authRoutes.js";
 import postRoutes from "./routes/postRoutes.js";
-
 import userRoutes from "./routes/userRoutes.js";
-
-app.set("trust proxy", 1);
 
 dotenv.config();
 
 const app = express();
+
+/**
+ * Важно для Render/любого reverse proxy:
+ * чтобы req.protocol стал "https" (по X-Forwarded-Proto),
+ * иначе ты генеришь http-ссылки и ловишь Mixed Content на фронте.
+ */
+app.set("trust proxy", 1); // [web:487]
 
 // --- Для ES Modules ---
 const __filename = fileURLToPath(import.meta.url);
@@ -28,13 +32,8 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // --- Routes ---
-// Авторизация
 app.use("/auth", authRoutes);
-
-// Посты (создание, получение)
 app.use("/posts", postRoutes);
-
-// Юзеры
 app.use("/users", userRoutes);
 
 // Тестовый корневой маршрут
@@ -47,8 +46,7 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB подключена");
-    app.listen(process.env.PORT || 5000, () =>
-      console.log(`Сервер запущен на порту ${process.env.PORT || 5000}`)
-    );
+    const port = process.env.PORT || 5000;
+    app.listen(port, () => console.log(`Сервер запущен на порту ${port}`));
   })
   .catch((err) => console.log(err));
