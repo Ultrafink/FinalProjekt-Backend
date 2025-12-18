@@ -9,6 +9,7 @@ import {
   createPost,
   getExplore,
   toggleLike,
+  toggleCommentLike,
   addComment,
   deletePost,
 } from "../controllers/postController.js";
@@ -43,6 +44,7 @@ router.get("/user/:username", authMiddleware, getUserPosts);
 // лайки и комменты (должны быть выше "/:id")
 router.post("/:id/like", authMiddleware, toggleLike);
 router.post("/:id/comments", authMiddleware, addComment);
+router.post("/:id/comments/:commentId/like", authMiddleware, toggleCommentLike);
 router.delete("/:id", authMiddleware, deletePost);
 
 // один пост

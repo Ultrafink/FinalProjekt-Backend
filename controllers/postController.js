@@ -195,3 +195,41 @@ export const deletePost = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/* ===========================
+   🔹 LIKE / UNLIKE COMMENT (TOGGLE)
+=========================== */
+export const toggleCommentLike = async (req, res) => {
+  try {
+    const { id, commentId } = req.params;
+
+    const post = await Post.findById(id)
+      .populate("author", "username avatar")
+      .populate("comments.author", "username avatar");
+
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const comment = post.comments.id(commentId);
+    if (!comment) return res.status(404).json({ message: "Comment not found" });
+
+    const userId = String(req.user.id);
+
+    const liked = Array.isArray(comment.likes)
+      ? comment.likes.some((uid) => String(uid) === userId)
+      : false;
+
+    if (liked) {
+      comment.likes = comment.likes.filter((uid) => String(uid) !== userId);
+    } else {
+      comment.likes = Array.isArray(comment.likes) ? comment.likes : [];
+      comment.likes.push(req.user.id);
+    }
+
+    await post.save();
+    res.json(post);
+  } catch (err) {
+    console.log("Toggle comment like error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
