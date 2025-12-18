@@ -15,7 +15,7 @@ export const authMiddleware = async (req, res, next) => {
     req.user = await User.findById(decoded.id).select("-password");
 
     return next();
-  } catch (error) {
+  } catch {
     return res.status(401).json({ message: "Invalid token" });
   }
 };
