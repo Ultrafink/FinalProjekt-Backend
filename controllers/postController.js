@@ -32,7 +32,6 @@ export const createPost = async (req, res) => {
 export const getFeed = async (req, res) => {
   try {
     const me = await User.findById(req.user.id);
-
     const ids = [req.user.id, ...(me?.following || [])];
 
     const posts = await Post.find({ author: { $in: ids } })
@@ -42,6 +41,20 @@ export const getFeed = async (req, res) => {
     res.json(posts);
   } catch (err) {
     console.log("Get feed error", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// GET /posts/explore
+export const getExplore = async (req, res) => {
+  try {
+    const posts = await Post.find({})
+      .populate("author", "username avatar")
+      .sort({ createdAt: -1 });
+
+    res.json(posts);
+  } catch (err) {
+    console.log("Get explore error", err);
     res.status(500).json({ message: "Server error" });
   }
 };
