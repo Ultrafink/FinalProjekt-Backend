@@ -2,11 +2,31 @@ import Post from "../models/Post.js";
 import User from "../models/User.js";
 
 /* ===========================
-   🔹 ЛЕНТА (ТОЛЬКО ПОДПИСКИ)
+   🔹 МОИ ПОСТЫ (HOME)
+=========================== */
+export const getMyPosts = async (req, res) => {
+  try {
+    const posts = await Post.find({ author: req.user.id })
+      .populate("author", "username avatar")
+      .sort({ createdAt: -1 });
+
+    res.json(posts);
+  } catch (err) {
+    console.log("Get my posts error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ===========================
+   🔹 ЛЕНТА (ПОДПИСКИ)
 =========================== */
 export const getFeed = async (req, res) => {
   try {
     const me = await User.findById(req.user.id);
+
+    if (!me) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     const posts = await Post.find({
       author: { $in: me.following },
@@ -45,7 +65,7 @@ export const getUserPosts = async (req, res) => {
 };
 
 /* ===========================
-   🔹 ОДИН ПОСТ (МОДАЛКА)
+   🔹 ОДИН ПОСТ
 =========================== */
 export const getPostById = async (req, res) => {
   try {
@@ -78,8 +98,6 @@ export const createPost = async (req, res) => {
       author: req.user.id,
       image: `/uploads/${req.file.filename}`,
       caption,
-      likes: [],
-      comments: [],
     });
 
     await post.save();

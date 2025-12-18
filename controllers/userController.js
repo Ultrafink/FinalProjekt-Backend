@@ -7,10 +7,10 @@ import Post from "../models/Post.js";
 export const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
-    res.json(user);
+    return res.json(user);
   } catch (err) {
     console.log("Get me error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -28,59 +28,59 @@ export const updateMe = async (req, res) => {
       });
 
       if (exists) {
-        return res
-          .status(400)
-          .json({ message: "Username already taken" });
+        return res.status(400).json({ message: "Username already taken" });
       }
     }
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
-      {
-        username,
-        website,
-        about,
-      },
+      { username, website, about },
       { new: true }
     ).select("-password");
 
-    res.json(updatedUser);
+    return res.json(updatedUser);
   } catch (err) {
     console.log("Update profile error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
 /* ===========================
-   🔹 ПУБЛИЧНЫЙ ПРОФИЛЬ
+   🔹 ПУБЛИЧНЫЙ ПРОФИЛЬ ПО USERNAME
+   (возвращает { user, stats } под твой ProfilePage)
 =========================== */
 export const getUserProfile = async (req, res) => {
   try {
     const { username } = req.params;
 
-    const user = await User.findOne({ username })
-      .select("-password")
-      .populate("followers", "_id")
-      .populate("following", "_id");
-
-    if (!user) {
+    const userDoc = await User.findOne({ username }).select("-password");
+    if (!userDoc) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const postsCount = await Post.countDocuments({
-      author: user._id,
-    });
+    const postsCount = await Post.countDocuments({ author: userDoc._id });
 
-    res.json({
-      user,
-      stats: {
-        posts: postsCount,
-        followers: user.followers.length,
-        following: user.following.length,
-      },
-    });
+    // req.user будет только если ты повесил optionalAuthMiddleware на роут /users/:username
+    const isMe = req.user && userDoc._id.toString() === req.user.id;
+
+    const user = {
+      _id: userDoc._id,
+      username: userDoc.username,
+      avatar: userDoc.avatar,
+      about: userDoc.about,
+      website: userDoc.website,
+      isMe,
+    };
+
+    const stats = {
+      posts: postsCount,
+      followers: userDoc.followers?.length ?? 0,
+      following: userDoc.following?.length ?? 0,
+    };
+
+    return res.json({ user, stats });
   } catch (err) {
     console.log("Get user profile error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
