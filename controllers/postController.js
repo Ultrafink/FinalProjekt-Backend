@@ -1,6 +1,18 @@
 import Post from "../models/Post.js";
 import User from "../models/User.js";
 
+// Подтягиваем автора поста + автора каждого комментария (username/fullName/avatar)
+// populate заменяет ObjectId на документ из коллекции User. [web:1257]
+const populatePost = (query) =>
+  query
+    .populate("author", "username fullName avatar")
+    .populate("comments.author", "username fullName avatar"); // nested populate [web:1257]
+
+const populatePosts = (query) =>
+  query
+    .populate("author", "username fullName avatar")
+    .populate("comments.author", "username fullName avatar"); // nested populate [web:1257]
+
 // --- Create ---
 export const createPost = async (req, res) => {
   try {
@@ -16,11 +28,7 @@ export const createPost = async (req, res) => {
       comments: [],
     });
 
-    const populated = await Post.findById(post._id).populate(
-      "author",
-      "username fullName avatar"
-    );
-
+    const populated = await populatePost(Post.findById(post._id));
     return res.json(populated);
   } catch (err) {
     console.error("Create post error:", err);
@@ -31,10 +39,9 @@ export const createPost = async (req, res) => {
 // --- Lists ---
 export const getMyPosts = async (req, res) => {
   try {
-    const posts = await Post.find({ author: req.user.id })
-      .populate("author", "username fullName avatar")
-      .sort({ createdAt: -1 });
-
+    const posts = await populatePosts(
+      Post.find({ author: req.user.id }).sort({ createdAt: -1 })
+    );
     return res.json(posts);
   } catch (err) {
     console.error("Get my posts error:", err);
@@ -44,10 +51,7 @@ export const getMyPosts = async (req, res) => {
 
 export const getExplorePosts = async (req, res) => {
   try {
-    const posts = await Post.find()
-      .populate("author", "username fullName avatar")
-      .sort({ createdAt: -1 });
-
+    const posts = await populatePosts(Post.find().sort({ createdAt: -1 }));
     return res.json(posts);
   } catch (err) {
     console.error("Get explore posts error:", err);
@@ -56,7 +60,7 @@ export const getExplorePosts = async (req, res) => {
 };
 
 // Фронт у тебя стучится в /posts/feed, поэтому эндпоинт обязан существовать.
-// Пока нет логики "фида" (подписки/друзья) — просто возвращаем то же, что explore.
+// Пока нет логики "фида" — просто возвращаем то же, что explore.
 export const getFeed = async (req, res) => {
   return getExplorePosts(req, res);
 };
@@ -69,9 +73,9 @@ export const getUserPosts = async (req, res) => {
     const user = await User.findOne({ username });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    const posts = await Post.find({ author: user._id })
-      .populate("author", "username fullName avatar")
-      .sort({ createdAt: -1 });
+    const posts = await populatePosts(
+      Post.find({ author: user._id }).sort({ createdAt: -1 })
+    );
 
     return res.json(posts);
   } catch (err) {
@@ -83,13 +87,8 @@ export const getUserPosts = async (req, res) => {
 // --- Single ---
 export const getPostById = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id).populate(
-      "author",
-      "username fullName avatar"
-    );
-
+    const post = await populatePost(Post.findById(req.params.id));
     if (!post) return res.status(404).json({ message: "Post not found" });
-
     return res.json(post);
   } catch (err) {
     console.error("Get post by id error:", err);
@@ -117,10 +116,7 @@ export const deletePost = async (req, res) => {
 // --- Likes ---
 export const toggleLike = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id).populate(
-      "author",
-      "username fullName avatar"
-    );
+    const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     const userId = String(req.user.id);
@@ -130,7 +126,10 @@ export const toggleLike = async (req, res) => {
     else post.likes.splice(idx, 1);
 
     await post.save();
-    return res.json(post);
+
+    // Чтобы фронт после лайка не терял populated поля
+    const populated = await populatePost(Post.findById(post._id));
+    return res.json(populated);
   } catch (err) {
     console.error("Toggle like error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -143,21 +142,21 @@ export const addComment = async (req, res) => {
     const text = (req.body.text || "").trim();
     if (!text) return res.status(400).json({ message: "Comment text is required" });
 
-    const post = await Post.findById(req.params.id).populate(
-      "author",
-      "username fullName avatar"
-    );
+    const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     post.comments.push({
-      author: req.user.id, // ✅ ВАЖНО: в твоей схеме commentSchema поле называется author
+      author: req.user.id, // важно: в schema поле author required
       text,
       likes: [],
-      // createdAt/updatedAt не задаём — timestamps: true сделает сам
+      // createdAt/updatedAt не задаём — timestamps сделает сам [web:1665]
     });
 
     await post.save();
-    return res.json(post);
+
+    // Возвращаем пост уже с username/avatar автора комментария
+    const populated = await populatePost(Post.findById(post._id));
+    return res.json(populated);
   } catch (err) {
     console.error("Add comment error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -168,13 +167,10 @@ export const toggleCommentLike = async (req, res) => {
   try {
     const { postId, commentId } = req.params;
 
-    const post = await Post.findById(postId).populate(
-      "author",
-      "username fullName avatar"
-    );
+    const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // Mongoose document arrays имеют метод .id() для поиска сабдокумента по _id
+    // .id() ищет сабдокумент по _id в массиве сабдокументов [web:1596]
     const comment = post.comments.id(commentId);
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
@@ -185,7 +181,9 @@ export const toggleCommentLike = async (req, res) => {
     else comment.likes.splice(idx, 1);
 
     await post.save();
-    return res.json(post);
+
+    const populated = await populatePost(Post.findById(post._id));
+    return res.json(populated);
   } catch (err) {
     console.error("Toggle comment like error:", err);
     return res.status(500).json({ message: "Server error" });
