@@ -1,4 +1,5 @@
 import Post from "../models/Post.js";
+import User from "../models/User.js";
 
 // --- Create ---
 export const createPost = async (req, res) => {
@@ -54,10 +55,27 @@ export const getExplorePosts = async (req, res) => {
   }
 };
 
-// Фронт у тебя стучится в /posts/feed, поэтому эндпоинт обязан существовать.
-// Пока нет логики "фида" (подписки/друзья) — просто возвращаем то же, что explore.
 export const getFeed = async (req, res) => {
   return getExplorePosts(req, res);
+};
+
+// ✅ Для ProfilePage.jsx: GET /posts/user/:username
+export const getUserPosts = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const user = await User.findOne({ username });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const posts = await Post.find({ author: user._id })
+      .populate("author", "username fullName avatar")
+      .sort({ createdAt: -1 });
+
+    return res.json(posts);
+  } catch (err) {
+    console.error("Get user posts error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
 };
 
 // --- Single ---
@@ -154,7 +172,6 @@ export const toggleCommentLike = async (req, res) => {
     );
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // Mongoose document arrays имеют метод .id() для поиска по _id сабдокумента [web:1596]
     const comment = post.comments.id(commentId);
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 

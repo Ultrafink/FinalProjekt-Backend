@@ -6,7 +6,8 @@ import {
   createPost,
   getMyPosts,
   getExplorePosts,
-  getFeed,          // <-- добавь в контроллер
+  getFeed,
+  getUserPosts,          // ✅ добавили
   getPostById,
   deletePost,
   toggleLike,
@@ -25,13 +26,16 @@ const upload = multer({ storage });
 
 // ---------- Lists (СТАТИКА СНАЧАЛА) ----------
 router.get("/me", authMiddleware, getMyPosts);
-router.get("/feed", authMiddleware, getFeed);         // <-- чтобы /posts/feed не попадал в /:id
+router.get("/feed", authMiddleware, getFeed);
 router.get("/explore", authMiddleware, getExplorePosts);
+
+// ✅ Профиль: посты конкретного пользователя
+router.get("/user/:username", authMiddleware, getUserPosts);
 
 // ---------- Create ----------
 router.post("/", authMiddleware, upload.single("image"), createPost);
 
-// ---------- Likes / Comments (тоже статика раньше /:id) ----------
+// ---------- Likes / Comments ----------
 router.post("/:id/like", authMiddleware, toggleLike);
 router.post("/:id/comments", authMiddleware, addComment);
 router.post("/:postId/comments/:commentId/like", authMiddleware, toggleCommentLike);
