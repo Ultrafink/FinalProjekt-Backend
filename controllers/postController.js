@@ -55,11 +55,13 @@ export const getExplorePosts = async (req, res) => {
   }
 };
 
+// Фронт у тебя стучится в /posts/feed, поэтому эндпоинт обязан существовать.
+// Пока нет логики "фида" (подписки/друзья) — просто возвращаем то же, что explore.
 export const getFeed = async (req, res) => {
   return getExplorePosts(req, res);
 };
 
-// ✅ Для ProfilePage.jsx: GET /posts/user/:username
+// --- Profile posts: /posts/user/:username ---
 export const getUserPosts = async (req, res) => {
   try {
     const { username } = req.params;
@@ -148,10 +150,10 @@ export const addComment = async (req, res) => {
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     post.comments.push({
-      user: req.user.id,
+      author: req.user.id, // ✅ ВАЖНО: в твоей схеме commentSchema поле называется author
       text,
       likes: [],
-      createdAt: new Date(),
+      // createdAt/updatedAt не задаём — timestamps: true сделает сам
     });
 
     await post.save();
@@ -172,6 +174,7 @@ export const toggleCommentLike = async (req, res) => {
     );
     if (!post) return res.status(404).json({ message: "Post not found" });
 
+    // Mongoose document arrays имеют метод .id() для поиска сабдокумента по _id
     const comment = post.comments.id(commentId);
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
