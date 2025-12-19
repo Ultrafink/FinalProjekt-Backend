@@ -1,16 +1,12 @@
 import Post from "../models/Post.js";
-import User from "../models/User.js";
 
-// POST /posts
 export const createPost = async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: "Image is required" });
-    }
+    if (!req.file) return res.status(400).json({ message: "Image is required" });
 
     const caption = req.body.caption || "";
 
-    const newPost = new Post({
+    const post = await Post.create({
       author: req.user.id,
       image: `uploads/${req.file.filename}`,
       caption,
@@ -18,112 +14,148 @@ export const createPost = async (req, res) => {
       comments: [],
     });
 
-    await newPost.save();
-    const populated = await newPost.populate("author", "username avatar");
+    const populated = await Post.findById(post._id).populate(
+      "author",
+      "username fullName avatar"
+    );
 
-    res.json(populated);
+    return res.json(populated);
   } catch (err) {
-    console.log("Create post error", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Create post error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
-// GET /posts/feed
-export const getFeed = async (req, res) => {
-  try {
-    const me = await User.findById(req.user.id);
-    const ids = [req.user.id, ...(me?.following || [])];
-
-    const posts = await Post.find({ author: { $in: ids } })
-      .populate("author", "username avatar")
-      .sort({ createdAt: -1 });
-
-    res.json(posts);
-  } catch (err) {
-    console.log("Get feed error", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// GET /posts/explore
-export const getExplore = async (req, res) => {
-  try {
-    const posts = await Post.find({})
-      .populate("author", "username avatar")
-      .sort({ createdAt: -1 });
-
-    res.json(posts);
-  } catch (err) {
-    console.log("Get explore error", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// GET /posts/me
 export const getMyPosts = async (req, res) => {
   try {
     const posts = await Post.find({ author: req.user.id })
-      .populate("author", "username avatar")
+      .populate("author", "username fullName avatar")
       .sort({ createdAt: -1 });
 
-    res.json(posts);
+    return res.json(posts);
   } catch (err) {
-    console.log("Get my posts error", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Get my posts error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
-// GET /posts/user/:username
-export const getUserPosts = async (req, res) => {
+export const getExplorePosts = async (req, res) => {
   try {
-    const username = req.params.username;
-    const user = await User.findOne({ username });
-
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const posts = await Post.find({ author: user.id })
-      .populate("author", "username avatar")
+    const posts = await Post.find()
+      .populate("author", "username fullName avatar")
       .sort({ createdAt: -1 });
 
-    res.json(posts);
+    return res.json(posts);
   } catch (err) {
-    console.log("Get user posts error", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Get explore posts error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
-// GET /posts/:id
 export const getPostById = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id).populate(
       "author",
-      "username avatar"
+      "username fullName avatar"
     );
 
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    res.json(post);
+    return res.json(post);
   } catch (err) {
-    console.log("Get post by id error", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Get post by id error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
-// DELETE /posts/:id
 export const deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
 
     if (!post) return res.status(404).json({ message: "Post not found" });
-
-    if (post.author.toString() !== req.user.id) {
+    if (String(post.author) !== String(req.user.id)) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    await Post.deleteOne({ _id: post.id });
-    res.json({ ok: true, id: post.id });
+    await post.deleteOne();
+    return res.json({ message: "Post deleted" });
   } catch (err) {
-    console.log("Delete post error", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Delete post error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const toggleLike = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id).populate(
+      "author",
+      "username fullName avatar"
+    );
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const userId = String(req.user.id);
+    const idx = post.likes.findIndex((id) => String(id) === userId);
+
+    if (idx === -1) post.likes.push(req.user.id);
+    else post.likes.splice(idx, 1);
+
+    await post.save();
+    return res.json(post);
+  } catch (err) {
+    console.error("Toggle like error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const addComment = async (req, res) => {
+  try {
+    const text = (req.body.text || "").trim();
+    if (!text) return res.status(400).json({ message: "Comment text is required" });
+
+    const post = await Post.findById(req.params.id).populate(
+      "author",
+      "username fullName avatar"
+    );
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    post.comments.push({
+      user: req.user.id,
+      text,
+      likes: [],
+      createdAt: new Date(),
+    });
+
+    await post.save();
+    return res.json(post);
+  } catch (err) {
+    console.error("Add comment error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const toggleCommentLike = async (req, res) => {
+  try {
+    const { postId, commentId } = req.params;
+
+    const post = await Post.findById(postId).populate(
+      "author",
+      "username fullName avatar"
+    );
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const comment = post.comments.id(commentId);
+    if (!comment) return res.status(404).json({ message: "Comment not found" });
+
+    const userId = String(req.user.id);
+    const idx = (comment.likes || []).findIndex((id) => String(id) === userId);
+
+    if (idx === -1) comment.likes.push(req.user.id);
+    else comment.likes.splice(idx, 1);
+
+    await post.save();
+    return res.json(post);
+  } catch (err) {
+    console.error("Toggle comment like error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 };
