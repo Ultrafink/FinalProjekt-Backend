@@ -1,5 +1,6 @@
 import Post from "../models/Post.js";
 
+// --- Create ---
 export const createPost = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "Image is required" });
@@ -26,6 +27,7 @@ export const createPost = async (req, res) => {
   }
 };
 
+// --- Lists ---
 export const getMyPosts = async (req, res) => {
   try {
     const posts = await Post.find({ author: req.user.id })
@@ -52,6 +54,13 @@ export const getExplorePosts = async (req, res) => {
   }
 };
 
+// Фронт у тебя стучится в /posts/feed, поэтому эндпоинт обязан существовать.
+// Пока нет логики "фида" (подписки/друзья) — просто возвращаем то же, что explore.
+export const getFeed = async (req, res) => {
+  return getExplorePosts(req, res);
+};
+
+// --- Single ---
 export const getPostById = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id).populate(
@@ -85,6 +94,7 @@ export const deletePost = async (req, res) => {
   }
 };
 
+// --- Likes ---
 export const toggleLike = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id).populate(
@@ -107,6 +117,7 @@ export const toggleLike = async (req, res) => {
   }
 };
 
+// --- Comments ---
 export const addComment = async (req, res) => {
   try {
     const text = (req.body.text || "").trim();
@@ -143,6 +154,7 @@ export const toggleCommentLike = async (req, res) => {
     );
     if (!post) return res.status(404).json({ message: "Post not found" });
 
+    // Mongoose document arrays имеют метод .id() для поиска по _id сабдокумента [web:1596]
     const comment = post.comments.id(commentId);
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 

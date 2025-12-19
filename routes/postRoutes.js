@@ -6,6 +6,7 @@ import {
   createPost,
   getMyPosts,
   getExplorePosts,
+  getFeed,          // <-- добавь в контроллер
   getPostById,
   deletePost,
   toggleLike,
@@ -22,19 +23,21 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ---------- Posts ----------
-router.post("/", authMiddleware, upload.single("image"), createPost);
+// ---------- Lists (СТАТИКА СНАЧАЛА) ----------
 router.get("/me", authMiddleware, getMyPosts);
-router.get("/", authMiddleware, getExplorePosts);
+router.get("/feed", authMiddleware, getFeed);         // <-- чтобы /posts/feed не попадал в /:id
+router.get("/explore", authMiddleware, getExplorePosts);
 
-router.get("/:id", authMiddleware, getPostById);
-router.delete("/:id", authMiddleware, deletePost);
+// ---------- Create ----------
+router.post("/", authMiddleware, upload.single("image"), createPost);
 
-// ---------- Likes ----------
+// ---------- Likes / Comments (тоже статика раньше /:id) ----------
 router.post("/:id/like", authMiddleware, toggleLike);
-
-// ---------- Comments ----------
 router.post("/:id/comments", authMiddleware, addComment);
 router.post("/:postId/comments/:commentId/like", authMiddleware, toggleCommentLike);
+
+// ---------- Single post (ПАРАМЕТР В САМОМ НИЗУ) ----------
+router.get("/:id", authMiddleware, getPostById);
+router.delete("/:id", authMiddleware, deletePost);
 
 export default router;
