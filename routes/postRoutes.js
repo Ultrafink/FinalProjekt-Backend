@@ -1,7 +1,7 @@
 import express from "express";
 import multer from "multer";
 
-import authMiddleware from "../middleware/authMiddleware.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 import {
   createPost,
   getMyPosts,
